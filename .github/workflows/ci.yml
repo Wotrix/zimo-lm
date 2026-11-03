@@ -1,0 +1,53 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install PyTorch (CPU)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install numpy
+
+      - name: Run package tests
+        run: python -m unittest discover -s tests -v
+
+  tjgpt-header:
+    # The zero-dependency container must stay readable without torch extras.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install numpy
+      - name: Verify bundled demo checkpoint loads
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from checkpoint_utils import load_state_any, infer_config_from_state
+          info = load_state_any(Path("examples/demo/model_best.pt"))
+          assert info["loadable"], info["error"]
+          cfg = infer_config_from_state(info["state"])
+          print("demo checkpoint:", cfg)
+          assert cfg["layers"] == 6 and cfg["dim"] == 192
+          PY
