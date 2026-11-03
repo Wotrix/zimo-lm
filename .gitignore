@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+out/
+out_*/
+runs/
+*.pt
+*.bin
+*.onnx
+*.onnx.data
+*.npy
+*.gz
+data/
+report.html
+
+# bundled demo model (small, intentional)
+!examples/demo/*.pt
+!examples/demo/*.safetensors
+!examples/demo/*.onnx
+!examples/demo/*.tjgpt

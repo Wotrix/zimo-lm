@@ -1,0 +1,13 @@
+# Normalise line endings so the shell scripts work on Linux/macOS.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh  text eol=lf
+
+*.pt          binary
+*.pth         binary
+*.safetensors binary
+*.onnx        binary
+*.tjgpt       binary
+*.png         binary

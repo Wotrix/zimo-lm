@@ -1,0 +1,10 @@
+[theme]
+base = "dark"
+primaryColor = "#2f6feb"
+backgroundColor = "#070b12"
+secondaryBackgroundColor = "#0f172a"
+textColor = "#e8eefc"
+font = "sans serif"
+
+[server]
+maxUploadSize = 4096   # MB; raise for large corpora (default is 200)

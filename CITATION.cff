@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this trainer or its evaluation protocol, cite this repository."
+title: "zimo-lm: a small character-level GPT-2 language model trainer"
+abstract: >-
+  A minimal, from-scratch GPT-2-style character-level language model trainer
+  with a live dashboard, a self-contained static report, corpus preparation,
+  and an offline candidate-reranking evaluator.  Intended as a reproducible
+  baseline for small Chinese language models and IME candidate scoring.
+authors:
+  - name: "Zimo contributors"
+date-released: "2026-11-02"
+license: MIT

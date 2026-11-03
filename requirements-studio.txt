@@ -1,0 +1,8 @@
+-r requirements.txt
+streamlit>=1.32
+pandas>=2.0
+altair>=5
+onnx>=1.15
+onnxruntime>=1.17
+onnxscript
+safetensors>=0.4
