@@ -43,15 +43,16 @@ def find_newest_run(root: Path) -> Optional[Path]:
     return max(candidates, key=lambda p: (p / "status.json").stat().st_mtime)
 
 
-def read_status(run_dir: Path) -> dict:
+def read_status(run_dir: Path, path: Optional[Path] = None) -> dict:
+    target = path or (run_dir / "status.json")
     try:
-        return json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+        return json.loads(Path(target).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
 
 
-def read_metrics(run_dir: Path) -> list[dict]:
-    path = run_dir / "metrics.jsonl"
+def read_metrics(run_dir: Path, override: Optional[Path] = None) -> list[dict]:
+    path = Path(override) if override else (run_dir / "metrics.jsonl")
     if not path.is_file():
         return []
     rows = []
@@ -190,9 +191,10 @@ def disk_info(path: Path) -> str:
 # panel
 # ---------------------------------------------------------------------------
 
-def render(run_dir: Path) -> str:
-    status = read_status(run_dir)
-    rows = read_metrics(run_dir)
+def render(run_dir: Path, status_path: Optional[Path] = None,
+           metrics_path: Optional[Path] = None) -> str:
+    status = read_status(run_dir, status_path)
+    rows = read_metrics(run_dir, metrics_path)
     series = ppl_series(rows)
     gpu = gpu_info()
 
@@ -264,6 +266,8 @@ def main() -> int:
     parser.add_argument("--runs-root", default="runs", help="runs 根目录（默认 runs）")
     parser.add_argument("-w", "--watch", action="store_true", help="持续刷新")
     parser.add_argument("-i", "--interval", type=float, default=10.0, help="刷新间隔秒（默认 10）")
+    parser.add_argument("--status", default="", help="指定 status.json（默认在运行目录里找）")
+    parser.add_argument("--metrics", default="", help="指定 metrics.jsonl")
     args = parser.parse_args()
 
     if args.run:
@@ -284,7 +288,9 @@ def main() -> int:
         while True:
             if args.watch:
                 sys.stdout.write("\033[H\033[J")  # clear (no Windows flicker)
-            print(render(run_dir))
+            print(render(run_dir,
+                         Path(args.status) if args.status else None,
+                         Path(args.metrics) if args.metrics else None))
             sys.stdout.flush()
             if not args.watch:
                 return 0

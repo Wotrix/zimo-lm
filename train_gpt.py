@@ -163,10 +163,10 @@ def main() -> int:
                     help="词表上限（默认 13000；字符级通常 4000-13000）")
     ap.add_argument("--out", default="out",
                     help="输出目录（存 model.pt / model_best.pt / vocab.txt）")
-    ap.add_argument("--metrics", default="out/metrics.jsonl",
-                    help="逐步指标文件（每行一条 JSON）")
-    ap.add_argument("--status", default="out/status.json",
-                    help="状态文件（state/step/loss/val_ppl 等）")
+    ap.add_argument("--metrics", default="",
+                    help="逐步指标文件（默认 <out>/metrics.jsonl）")
+    ap.add_argument("--status", default="",
+                    help="状态文件（默认 <out>/status.json）")
     ap.add_argument("--device", default="auto",
                     help="运行设备：auto | cpu | cuda | musa（默认自动检测；摩尔线程用 musa）")
     ap.add_argument("--tied", action="store_true",
@@ -183,7 +183,11 @@ def main() -> int:
                     help="最多训练多少步（0 = 不限制；调试时可设 50）")
     args = ap.parse_args()
 
+    # Keep a run self-contained: status/metrics default into the run directory
+    # so `monitor.py --run <dir>` and the Studio both find them.
     os.makedirs(args.out, exist_ok=True)
+    args.metrics = args.metrics or os.path.join(args.out, "metrics.jsonl")
+    args.status = args.status or os.path.join(args.out, "status.json")
     os.makedirs(os.path.dirname(args.metrics) or ".", exist_ok=True)
     t0 = time.time()
 
