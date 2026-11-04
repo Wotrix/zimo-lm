@@ -134,6 +134,40 @@ python monitor.py --run runs/base_8x256 --no-color
 只依赖标准库：`nvidia-smi` 存在就显示 GPU（型号/显存/温度/功耗），
 没有就显示「未检测到 nvidia-smi（CPU 训练）」。摩尔线程机器上同样可用。
 
+## 评测：拿留出语料算分
+
+训练日志里的 val_ppl 是训练时切出来的 2%，用来选 checkpoint；**正式对比要用留出语料单独评**：
+
+```bash
+# 单个模型
+python eval.py --model runs/base_8x256 --corpus data/valid.txt
+
+# 多个模型对比（同一份语料、同一批 token）
+python eval.py --model runs/base_6x192 --model runs/base_8x256                --corpus data/valid.txt --limit 2000000
+```
+
+输出：
+
+```text
+model                             arch                params      ppl      nll  bits/char
+-----------------------------------------------------------------------------------------
+base_6x192                        gpt2 6x192       4,596,096    41.72   3.7310      5.383
+base_8x256                        gpt2 8x256       9,406,976    36.15   3.5877      5.176 ←
+
+语料：data/valid.txt（2,000,000 tokens，设备 cuda）
+```
+
+指标含义：
+
+| 指标 | 含义 |
+|---|---|
+| **PPL** | 困惑度，越低越好；跨语料不可比，同语料可比 |
+| **NLL** | 每 token 平均负对数似然，PPL 的底层值 |
+| **bits/char** | 每字符信息量（bits），跨模型/跨词表最公平 |
+
+注意：`--corpus` 必须放**训练时没见过**的文本（LCCC 的 `lccc_base_valid.jsonl.gz`
+就适合），否则分数虚高。
+
 ## 产物
 
 ```text

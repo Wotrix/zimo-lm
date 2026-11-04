@@ -117,6 +117,7 @@ INT8 体积约为 FP32 的 1/4，PPL 偏差通常 < 0.2%。
 - [quickstart.md](quickstart.md) — 安装、跑通、训第一个模型
 - [docs/cli.zh.md](docs/cli.zh.md) — 命令行训练完整指引（参数表、配方、常见错误、进度面板）
 - [docs/rent-gpu.md](docs/rent-gpu.md) — 租 GPU 训练全流程（选卡、装环境、冒烟、配方、费用）
+- `python eval.py --model runs/a --model runs/b --corpus valid.txt` — 留出语料对比 PPL/NLL/bits-per-char
 - Studio 内「使用说明 / Docs」— 十二章规格书：模型类型、六个训练器规格、五维自定义、部署平台、指标与常见问题
 - [MODEL_CARD.md](MODEL_CARD.md) · [DATA_CARD.md](DATA_CARD.md) — 模型与数据说明
 
