@@ -1,2 +1,18 @@
-torch>=2.0
+# Runtime dependencies (single file: used by both local setup and hosted demos).
+#
+# torch comes from the CPU index so Streamlit Community Cloud (~1 GB RAM) can
+# install and boot.  Local GPU machines install the CUDA build first
+# (setup.sh / setup.bat does it automatically); pip then sees this requirement
+# satisfied and leaves the CUDA build alone.
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+
+torch
 numpy>=1.24
+streamlit>=1.32
+pandas>=2.0
+altair>=5
+onnx>=1.15
+onnxruntime>=1.17
+onnxscript
+safetensors>=0.4

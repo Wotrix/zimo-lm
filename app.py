@@ -120,6 +120,11 @@ APP_VERSION = "0.4.0"
 # set ZIMO_DATA_DIR to point somewhere else.
 LOCAL_DATA_HINT = os.environ.get("ZIMO_DATA_DIR", "examples")
 
+# Set ZIMO_CLOUD=1 on a hosted demo: training is hidden (long CPU/GPU work is
+# not appropriate on community hosting), the local-path input is hidden, and
+# only the bundled demo model is offered.
+CLOUD_MODE = os.environ.get("ZIMO_CLOUD", "").strip() in ("1", "true", "yes")
+
 CLASSIC_DASHBOARD_URL = os.environ.get(
     "ZIMO_CLASSIC_DASHBOARD_URL", "http://127.0.0.1:8765")
 
@@ -4632,6 +4637,41 @@ def render_training(controls: dict) -> None:
 
 
 
+def cloud_sidebar() -> None:
+    """Minimal sidebar for the hosted demo (no training controls)."""
+    with st.sidebar:
+        st.markdown("### ZIMO <span style='color:#22d3ee'>LM</span>",
+                    unsafe_allow_html=True)
+        st.caption(tr("在线演示 · 端侧小模型工作台",
+                      "Online demo · edge-scale LM workbench"))
+        st.caption(tr("训练请在本机运行：python train_gpt.py --help",
+                      "Train locally: python train_gpt.py --help"))
+        st.divider()
+        lang_label = st.radio(
+            "语言 / Language", ["中文", "English"], horizontal=True,
+            index=0 if st.session_state.get("lang", "zh") == "zh" else 1,
+            key="language_choice")
+        new_lang = "zh" if lang_label == "中文" else "en"
+        if st.session_state.get("lang") != new_lang:
+            st.session_state.lang = new_lang
+            st.rerun()
+        st.divider()
+        theme_label = st.radio(
+            "主题 / Theme",
+            [tr("深色 Dark", "深色 Dark"), tr("浅色 Light", "浅色 Light")],
+            horizontal=True, key="theme_choice",
+            index=0 if st.session_state.get("theme", "dark") == "dark" else 1)
+        new_theme = "light" if "浅色" in theme_label else "dark"
+        if st.session_state.get("theme") != new_theme:
+            st.session_state.theme = new_theme
+            st.rerun()
+        if st.button(tr("使用说明 / Docs", "使用说明 / Docs"),
+                     use_container_width=True, key="cloud_docs"):
+            open_documentation()
+        st.markdown(f'<div class="tj-version">Zimo Studio v{APP_VERSION} · MIT</div>',
+                    unsafe_allow_html=True)
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Zimo · Studio",
@@ -4641,6 +4681,25 @@ def main() -> None:
     )
     inject_css()
     init_state()
+
+    if CLOUD_MODE:
+        cloud_sidebar()
+        hero()
+        st.info(tr(
+            "在线演示：可直接使用内置示例模型做打分、纠错与导出。"
+            "训练需要本机 CPU/GPU 与本地语料，请在本地运行（见 README 的快速开始）。",
+            "Online demo: score text, try corrections and export with the bundled "
+            "demo model. Training needs a local machine and corpus - run it "
+            "locally (see the README quickstart)."))
+        tab_play, tab_export = st.tabs([
+            tr("模型测试台", "Model playground"),
+            tr("导出与量化", "Export & Quantization")])
+        with tab_play:
+            render_playground()
+        with tab_export:
+            render_export_tab()
+        return
+
     auto_attach_run()
     sync_process()
 

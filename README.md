@@ -104,6 +104,14 @@ UTF-8（含 BOM）与 GBK/GB18030 都能正确解码。
 
 INT8 体积约为 FP32 的 1/4，PPL 偏差通常 < 0.2%。
 
+## 在线演示（可选）
+
+仓库里有云端演示入口 `app_cloud.py`：只开测试台与导出，用自带示例模型，
+**不含训练**（云端既没有语料也不适合长计算）。
+
+想在自己账号上部署，见 [docs/deploy-cloud.md](docs/deploy-cloud.md)
+（Streamlit Community Cloud / Hugging Face Spaces 两种方式与踩坑表）。
+
 ## 文档
 
 - [quickstart.md](quickstart.md) — 安装、跑通、训第一个模型

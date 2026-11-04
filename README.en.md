@@ -113,6 +113,16 @@ as well as GBK/GB18030 decode correctly.
 
 INT8 is roughly 1/4 the size of FP32 with PPL drift usually under 0.2%.
 
+## Hosted demo (optional)
+
+`app_cloud.py` is a demo-only entry point: playground + export, using the
+bundled model, **no training** (no corpus, and long compute is not appropriate
+on community hosting).
+
+To deploy on your own account see [docs/deploy-cloud.md](docs/deploy-cloud.md)
+(Streamlit Community Cloud and Hugging Face Spaces, plus a troubleshooting
+table).
+
 ## Docs
 
 - [quickstart.md](quickstart.md) — install, run, train your first model
