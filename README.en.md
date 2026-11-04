@@ -106,6 +106,7 @@ INT8 is roughly 1/4 the size of FP32 with PPL drift usually under 0.2%.
 ## Docs
 
 - [quickstart.md](quickstart.md) — install, run, train your first model
+- [docs/cli.zh.md](docs/cli.zh.md) — full CLI guide (Chinese); `python train_gpt.py --help` is Chinese too
 - In-app "使用说明 / Docs" — a twelve-chapter manual: model types, the six
   trainers, five customization dimensions, deployment matrix, metrics, FAQ
 - [MODEL_CARD.md](MODEL_CARD.md) · [DATA_CARD.md](DATA_CARD.md)

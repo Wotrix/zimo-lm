@@ -98,6 +98,7 @@ INT8 体积约为 FP32 的 1/4，PPL 偏差通常 < 0.2%。
 ## 文档
 
 - [quickstart.md](quickstart.md) — 安装、跑通、训第一个模型
+- [docs/cli.zh.md](docs/cli.zh.md) — 命令行训练完整指引（参数表、配方、常见错误）
 - Studio 内「使用说明 / Docs」— 十二章规格书：模型类型、六个训练器规格、五维自定义、部署平台、指标与常见问题
 - [MODEL_CARD.md](MODEL_CARD.md) · [DATA_CARD.md](DATA_CARD.md) — 模型与数据说明
 

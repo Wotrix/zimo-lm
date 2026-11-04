@@ -131,33 +131,54 @@ def write_json(path: str, payload: dict) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--corpus", default="corpus.txt")
-    ap.add_argument("--tokens", type=int, default=15_000_000)
-    ap.add_argument("--epochs", type=int, default=3)
-    ap.add_argument("--block", type=int, default=64)
-    ap.add_argument("--batch", type=int, default=32)
-    ap.add_argument("--dim", type=int, default=128)
-    ap.add_argument("--layers", type=int, default=3)
-    ap.add_argument("--heads", type=int, default=4)
-    ap.add_argument("--lr", type=float, default=3e-4)
-    ap.add_argument("--min-count", type=int, default=20)
-    ap.add_argument("--max-vocab", type=int, default=13_000)
-    ap.add_argument("--out", default="out")
-    ap.add_argument("--metrics", default="out/metrics.jsonl")
-    ap.add_argument("--status", default="out/status.json")
+    ap = argparse.ArgumentParser(
+        prog="train_gpt.py",
+        description="Zimo Studio 字符级语言模型训练器（从零训练，无预训练权重）",
+        epilog='示例：\n  最小冒烟：\n    python train_gpt.py --corpus examples/sample.txt --tokens 200000 --epochs 1 --dim 64 --layers 2 --heads 2 --out runs/smoke\n  常规训练：\n    python train_gpt.py --corpus corpus.txt --tokens 30000000 --epochs 2 --dim 192 --layers 6 --heads 4 --out runs/base\n  GPU 续训：\n    python train_gpt.py --corpus corpus.txt --device cuda --out runs/base --resume\n完整说明：docs/cli.zh.md',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ap.add_argument("--corpus", default="corpus.txt",
+                    help="训练语料路径（每行一句；字符之间用空格分隔更佳）")
+    ap.add_argument("--tokens", type=int, default=15_000_000,
+                    help="最多读取多少 token（默认 1500 万；越大越慢）")
+    ap.add_argument("--epochs", type=int, default=3,
+                    help="训练轮数（默认 3；小语料 5-10，大语料 1-3）")
+    ap.add_argument("--block", type=int, default=64,
+                    help="上下文长度，一次看多少个 token（默认 64）")
+    ap.add_argument("--batch", type=int, default=32,
+                    help="批大小（CPU 默认 32；GPU 可 64-256，显存不足就调小）")
+    ap.add_argument("--dim", type=int, default=128,
+                    help="隐藏维度，需能被 --heads 整除（默认 128）")
+    ap.add_argument("--layers", type=int, default=3,
+                    help="Transformer 层数（默认 3；4M 模型用 6）")
+    ap.add_argument("--heads", type=int, default=4,
+                    help="注意力头数（默认 4；dim 必须能被它整除）")
+    ap.add_argument("--lr", type=float, default=3e-4,
+                    help="学习率（默认 3e-4；大模型可降到 1e-4）")
+    ap.add_argument("--min-count", type=int, default=20,
+                    help="字符最低出现次数，低于它的丢弃（小语料请调成 1-3，否则词表会塌）")
+    ap.add_argument("--max-vocab", type=int, default=13_000,
+                    help="词表上限（默认 13000；字符级通常 4000-13000）")
+    ap.add_argument("--out", default="out",
+                    help="输出目录（存 model.pt / model_best.pt / vocab.txt）")
+    ap.add_argument("--metrics", default="out/metrics.jsonl",
+                    help="逐步指标文件（每行一条 JSON）")
+    ap.add_argument("--status", default="out/status.json",
+                    help="状态文件（state/step/loss/val_ppl 等）")
     ap.add_argument("--device", default="auto",
-                    help="auto | cpu | cuda —— Colab 用 cuda")
+                    help="运行设备：auto | cpu | cuda（默认自动检测）")
     ap.add_argument("--tied", action="store_true",
-                    help="share token embedding and output head (default: untied)")
-    ap.add_argument("--resume", action="store_true")
+                    help="共享输入词向量与输出头（默认不共享）")
+    ap.add_argument("--resume", action="store_true",
+                    help="从 --out 目录里的 model.pt 继续训练（断点续训）")
     ap.add_argument("--warmup", type=int, default=300,
-                    help="线性 warmup 步数")
+                    help="线性 warmup 步数（默认 300；小语料可设 0）")
     ap.add_argument("--val-ratio", type=float, default=0.02,
-                    help="验证集比例（按窗口切分，取尾部）")
+                    help="验证集比例，从语料尾部切出（默认 0.02；0 = 不验证）")
     ap.add_argument("--save-every", type=int, default=500,
-                    help="每 N 步存一次检查点（Colab 会断线，必须定期落盘）")
-    ap.add_argument("--max-steps", type=int, default=0)
+                    help="每 N 步保存一次检查点（默认 500；断线重跑依赖它）")
+    ap.add_argument("--max-steps", type=int, default=0,
+                    help="最多训练多少步（0 = 不限制；调试时可设 50）")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)

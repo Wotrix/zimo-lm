@@ -722,6 +722,20 @@ def sync_process() -> None:
 # Uploaded data preparation
 # ---------------------------------------------------------------------------
 
+def _decode_text(data: bytes) -> str:
+    """Decode a Chinese text file: UTF-8 (with/without BOM), then GB18030.
+
+    Windows Notepad still saves ANSI/GBK by default, so plain UTF-8 decoding
+    with ``errors="replace"`` would silently turn a whole corpus into U+FFFD.
+    """
+    for encoding in ("utf-8-sig", "gb18030"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
 def _clean_lines(raw_lines, clean_opts: Optional[dict] = None,
                  limit_chars: Optional[int] = None):
     """Apply the cleaning pipeline to an iterable of raw text lines.
@@ -781,6 +795,10 @@ def _iter_file_lines(path: Path):
     its own line so the character LM sees sentence boundaries.
     """
     name = path.name.lower()
+    if not name.endswith((".jsonl", ".json", ".gz")):
+        # Plain text: decode whole file so GBK/ANSI corpora survive.
+        yield from _decode_text(path.read_bytes()).splitlines()
+        return
     if name.endswith(".gz"):
         opener = lambda: gzip.open(path, "rt", encoding="utf-8", errors="replace")  # noqa: E731
     else:
@@ -913,7 +931,7 @@ def save_text_corpus(upload, run_dir: Path,
     """Normalise uploaded .txt files to one character-tokenised line each."""
     parts = []
     for item in _as_uploads(upload):
-        parts.append(item.getvalue().decode("utf-8-sig", errors="replace"))
+        parts.append(_decode_text(item.getvalue()))
     raw_lines = (line for chunk in parts for line in chunk.splitlines())
     lines = _clean_lines(raw_lines, clean_opts)
     if not lines:
@@ -945,7 +963,7 @@ def save_event_data(upload, run_dir: Path) -> Path:
         path.write_bytes(raw)
         return path
 
-    text = raw.decode("utf-8-sig", errors="replace")
+    text = _decode_text(raw)
     reader = csv.DictReader(io.StringIO(text))
     rows = []
     for row in reader:

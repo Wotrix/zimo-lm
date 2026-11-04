@@ -141,4 +141,5 @@ cd .. && rm -rf zimo-lm        # Windows: 直接删除文件夹
   --dim 128 --layers 4 --heads 4 --block 64 --out runs/cli_demo
 ```
 
-完整参数见 `python train_gpt.py --help`。
+完整参数见 `python train_gpt.py --help`（**中文说明**），
+或 [docs/cli.zh.md](docs/cli.zh.md)（参数表、GPU/续训配方、常见错误）。
