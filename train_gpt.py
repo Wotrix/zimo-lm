@@ -37,6 +37,18 @@ import torch
 import torch.nn as nn
 
 from device_utils import resolve_device
+
+# Throughput knobs.  TF32 affects only FP32 matmuls (bf16 autocast ignores it);
+# cudnn.benchmark picks the fastest convolution/attention kernels once.
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
+    try:
+        torch.backends.cuda.enable_flash_sdp(True)
+        torch.backends.cuda.enable_mem_efficient_sdp(True)
+    except Exception:  # noqa: BLE001 - older builds lack these switches
+        pass
 import torch.nn.functional as F
 
 
@@ -227,6 +239,13 @@ def main() -> int:
             scaler = torch.amp.GradScaler("cuda")
     amp_label = (str(amp_dtype).replace("torch.", "") if use_amp else "off")
     print(f"[lm] amp={amp_label}", flush=True)
+    run_meta = {
+        "epochs": args.epochs, "batch": args.batch, "block": seq,
+        "dim": args.dim, "layers": args.layers, "heads": args.heads,
+        "lr": args.lr, "warmup": args.warmup, "amp": amp_label,
+        "device": str(device), "compile": bool(args.compile),
+        "corpus": os.path.basename(args.corpus),
+    }
 
     torch.manual_seed(7)
     model = GPTLM(len(vocab) + 1, seq, args.dim, args.layers, args.heads).to(device)
@@ -239,7 +258,11 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 - never block training
             print(f"[lm] torch.compile unavailable ({type(exc).__name__}), continuing",
                   flush=True)
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
+    try:
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
+                                weight_decay=0.01, fused=device.type == "cuda")
+    except (TypeError, RuntimeError):
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     params = sum(p.numel() for p in model.parameters())
     start_epoch = 0
     global_step = 0
@@ -272,7 +295,7 @@ def main() -> int:
         "step": global_step, "elapsed_s": 0, "eta_s": None,
         "tokens_per_s": 0, "last_loss": None, "last_ppl": None,
         "arch": f"gpt2 {args.layers}x{args.dim}",
-        "amp": amp_label,
+        **run_meta,
     })
 
     best_val = float("inf")
@@ -340,7 +363,7 @@ def main() -> int:
                     "last_loss": round(avg, 4),
                     "last_ppl": round(min(1e6, ppl), 1),
                     "arch": f"gpt2 {args.layers}x{args.dim}",
-        "amp": amp_label,
+        **run_meta,
                 })
                 if global_step % 200 == 0:
                     print(f"[lm] epoch={epoch} step={global_step} loss={avg:.4f} "
@@ -407,7 +430,7 @@ def main() -> int:
         "eta_s": 0, "tokens_per_s": 0,
         "last_loss": round(float(loss.detach()), 4), "last_ppl": None,
         "arch": f"gpt2 {args.layers}x{args.dim}",
-        "amp": amp_label,
+        **run_meta,
     })
     print("[lm] done", flush=True)
     return 0

@@ -168,6 +168,16 @@ base_8x256                        gpt2 8x256       9,406,976    36.15   3.5877  
 注意：`--corpus` 必须放**训练时没见过**的文本（LCCC 的 `lccc_base_valid.jsonl.gz`
 就适合），否则分数虚高。
 
+## 模型说明卡
+
+```bash
+python make_model_card.py --run runs/base_8x256        # 生成 runs/base_8x256/README.md
+python make_model_card.py --index models/              # 为目录下所有模型生成总索引
+```
+
+卡片内容全部来自运行记录：结构（从 checkpoint 读）、训练配置（status.json /
+train_config.json）、验证曲线（metrics.jsonl）、本机 CPU 延迟实测、INT8 体积估算。
+
 ## 产物
 
 ```text
