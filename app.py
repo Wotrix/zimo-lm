@@ -70,6 +70,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from device_utils import (backend_label, detect_backend, resolve_device)
 from checkpoint_utils import (CHECKPOINT_SUFFIXES, extract_vocab_words,
                               find_latest_run, infer_config_from_state,
                               inspect_checkpoint_file, load_state_any)
@@ -1133,8 +1134,9 @@ def start_training(upload, arch_key: str, arch_kind: str, epochs: int,
     if trainer_path(arch_key) is None:
         st.error("当前项目里找不到对应的 trainer，请设置 ZIMO_TRAINER_ROOT。")
         return
-    if use_gpu and arch_key == "gpt2" and not torch.cuda.is_available():
-        st.error("选择了 GPU，但当前 PyTorch 检测不到 CUDA。")
+    if use_gpu and arch_key == "gpt2" and detect_backend() == "cpu":
+        st.error(tr("选择了 GPU，但当前 PyTorch 检测不到 CUDA / MUSA。",
+                    "GPU selected, but neither CUDA nor MUSA is available."))
         return
     if (arch_key == "gpt2" and arch_params
             and int(arch_params.get("dim", 192)) % int(arch_params.get("heads", 4)) != 0):
@@ -2734,12 +2736,7 @@ def sidebar() -> dict[str, Any]:
     with st.sidebar:
         st.markdown("### ZIMO <span style='color:#22d3ee'>LM</span>",
                     unsafe_allow_html=True)
-        cuda = torch.cuda.is_available()
-        st.caption(tr(
-            f"硬件：GPU · {torch.cuda.get_device_name(0)}" if cuda
-            else "硬件：CPU（未检测到 CUDA）",
-            f"Hardware: GPU · {torch.cuda.get_device_name(0)}" if cuda
-            else "Hardware: CPU (no CUDA)"))
+        st.caption(tr(f"硬件：{backend_label()}", f"Hardware: {backend_label()}"))
         st.caption(tr("端侧小模型工作台", "Edge-scale LM workbench"))
 
         task = st.radio(
@@ -2930,18 +2927,18 @@ def sidebar() -> dict[str, Any]:
             st.caption(tr("GPT-2 是默认推荐：只要有纯文本就能训。",
                           "GPT-2 is the default recommendation: plain text is enough."))
 
-        cuda = torch.cuda.is_available()
+        backend = detect_backend()
         hardware = st.radio(
-            tr("硬件", "Hardware"), ["CPU", "GPU (CUDA)"],
-            index=1 if cuda else 0, horizontal=True,
-            help=tr("GPT-2 可用 CUDA；LSTM/MLP 目前 CPU-only。",
-                    "GPT-2 can use CUDA; LSTM/MLP are CPU-only."))
+            tr("硬件", "Hardware"), ["CPU", "GPU (CUDA / MUSA)"],
+            index=1 if backend != "cpu" else 0, horizontal=True,
+            help=tr("GPT-2 可用 CUDA 或摩尔线程 MUSA；LSTM/MLP 目前 CPU-only。",
+                    "GPT-2 runs on CUDA or Moore Threads MUSA; LSTM/MLP are CPU-only."))
         if hardware.startswith("GPU"):
-            if cuda:
-                st.caption(f"CUDA: {torch.cuda.get_device_name(0)}")
+            if backend == "cpu":
+                st.warning(tr("当前环境没有 CUDA / MUSA；GPT-2 会选择 CPU。",
+                              "Neither CUDA nor MUSA is available; GPT-2 uses CPU."))
             else:
-                st.warning(tr("当前环境没有 CUDA；GPT-2 会选择 CPU。",
-                              "CUDA is unavailable; GPT-2 will use CPU."))
+                st.caption(backend_label())
         if arch_key != "gpt2":
             st.caption(tr("该 trainer 目前 CPU-only，硬件选择会被忽略。",
                           "This trainer is CPU-only; the hardware choice is ignored."))

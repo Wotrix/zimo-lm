@@ -35,6 +35,8 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
+
+from device_utils import resolve_device
 import torch.nn.functional as F
 
 
@@ -166,7 +168,7 @@ def main() -> int:
     ap.add_argument("--status", default="out/status.json",
                     help="状态文件（state/step/loss/val_ppl 等）")
     ap.add_argument("--device", default="auto",
-                    help="运行设备：auto | cpu | cuda（默认自动检测）")
+                    help="运行设备：auto | cpu | cuda | musa（默认自动检测；摩尔线程用 musa）")
     ap.add_argument("--tied", action="store_true",
                     help="共享输入词向量与输出头（默认不共享）")
     ap.add_argument("--resume", action="store_true",
@@ -194,11 +196,15 @@ def main() -> int:
     print(f"[lm] tokens={len(tokens)} vocab={len(vocab)+1} windows={data.shape[0]}",
           flush=True)
 
-    if args.device == "auto":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        device = torch.device(args.device)
-    print(f"[lm] device={device}", flush=True)
+    # MUSA (Moore Threads) exposes torch.musa, not torch.cuda; resolve centrally.
+    backend = resolve_device(args.device)
+    device = torch.device(backend)
+    print(f"[lm] device={device} backend={backend}", flush=True)
+    if backend == "musa":
+        try:
+            print(f"[lm] musa={torch.musa.get_device_name(0)}", flush=True)
+        except Exception:  # noqa: BLE001
+            pass
 
     torch.manual_seed(7)
     model = GPTLM(len(vocab) + 1, seq, args.dim, args.layers, args.heads).to(device)
