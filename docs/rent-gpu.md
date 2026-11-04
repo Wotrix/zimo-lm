@@ -66,20 +66,32 @@ device     : NVIDIA GeForce RTX 4090
 
 ---
 
-## 3. 上传语料（用本地路径，别用网页上传）
+## 3. 准备语料并上传
 
-把语料传到机器上（`scp` / `rsync` / 对象存储均可）：
+### 3.1 本地转成训练文本（一次性）
+
+LCCC 的 `.jsonl.gz` 要先转成「每行一句、字符间空格」的文本：
+
+```bash
+# base 取 1.5 亿字符，large 取 1.5 亿字符，合成 3 亿
+python prepare_corpus.py --input yuliao/lccc_base_train.jsonl.gz     --output corpus_base.txt --max-chars 150000000
+python prepare_corpus.py --input yuliao/lccc_large.jsonl.gz     --output corpus_large.txt --max-chars 150000000
+cat corpus_base.txt corpus_large.txt > corpus_300m.txt
+wc -c corpus_300m.txt          # 约 1.2 GB（字符间有空格，体积约 4 字节/字）
+```
+
+小语料够用时可以只做基线，`--max-chars 50000000` 即可。
+
+### 3.2 上传
 
 ```bash
 # 本地执行
-scp -r ./yuliao user@<host>:~/zimo-lm/data/
+scp corpus_300m.txt user@<host>:~/zimo-lm/data/
 ```
 
-语料要求：每行一句；`.txt` / `.jsonl` / `.jsonl.gz` 都行；UTF-8 或 GBK 均可。
-
-> 全量 LCCC 解压后约 2.4 GB / 8.68 亿字符。训练时只会按 `--tokens` 读取，
-> 不会一次性载入全部——但要注意 `--tokens` 越大，内存占用越高
->（`token 数 × 8 字节` 的 numpy 数组 + 字符串列表）。
+> 也可以直接把 `.jsonl.gz` 传上去，在机器上用同一个脚本转换，省一次拷贝。
+> 训练时只按 `--tokens` 读取，不会一次性载入全部；但 `--tokens` 越大内存越高
+>（int64 数组 + 字符串列表）。
 
 ---
 
