@@ -55,6 +55,30 @@ run.bat        :: Windows
 
 浏览器打开 <http://127.0.0.1:8769>。
 
+### 装成全局命令（可选，推荐）
+
+想在任意目录直接敲 `zimo` 启动：
+
+```bat
+:: Windows：把项目里的 zimo.bat 放进一个在 PATH 中的目录
+mkdir "%USERPROFILE%in" 2>nul
+copy zimo.bat "%USERPROFILE%in\zimo.bat"
+:: 然后把 %USERPROFILE%in 加进用户 PATH（只需一次），重开终端生效
+```
+
+```bash
+# macOS / Linux
+sudo ln -sf "$PWD/zimo.sh" /usr/local/bin/zimo
+```
+
+之后：
+
+```bash
+zimo                  # 默认 8769，被占用时自动换下一个空闲端口
+zimo --port 8800      # 指定端口
+zimo --no-browser     # 不自动打开浏览器
+```
+
 ## 3. 先玩示例（不需要训练）
 
 打开「**模型测试台**」：

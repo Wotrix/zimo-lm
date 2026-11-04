@@ -55,6 +55,9 @@ cd zimo-lm
 ./run.sh      # Windows: run.bat     （启动 http://127.0.0.1:8769）
 ```
 
+想把启动做成全局命令：把 `zimo.bat`（或软链 `zimo.sh`）放进 PATH，之后任意目录
+`zimo` 即可，`zimo --port 8800` 可换端口。
+
 **不用训练也能玩**：仓库自带 4.31M 参数的示例模型（`examples/demo/`），
 打开「模型测试台」输入几行候选即可看到打分、逐字 NLL 与纠错建议。
 

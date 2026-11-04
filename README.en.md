@@ -60,6 +60,9 @@ cd zimo-lm
 ./run.sh      # macOS/Linux. Windows: run.bat   -> http://127.0.0.1:8769
 ```
 
+Put `zimo.bat` (or a symlink to `zimo.sh`) on your PATH and `zimo` starts the
+Studio from any directory; `zimo --port 8800` changes the port.
+
 **No training needed to try it**: the repo ships a 4.31M-parameter demo model
 (`examples/demo/`). Open the playground, type a few candidates, and you get
 scores, per-character NLL and correction hints immediately.
