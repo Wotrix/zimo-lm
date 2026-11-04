@@ -21,8 +21,27 @@ chmod +x setup.sh run.sh
 ./setup.sh
 ```
 
-脚本会创建 `.venv`、安装 `requirements-studio.txt`（streamlit / torch / pandas /
-altair / onnx / onnxruntime / safetensors）。
+脚本会创建 `.venv` 并安装依赖。**它会自动识卡装对应的 PyTorch**：
+
+| 情况 | 安装的 torch |
+|---|---|
+| 有 NVIDIA 显卡（`nvidia-smi` 可用） | CUDA 版（`cu124`，约 2.5 GB） |
+| 没有 NVIDIA 显卡 | CPU 版（约 130 MB） |
+| 想强制指定 | `setup.bat cpu` / `./setup.sh cpu`，或 `cu121` / `cu124` / `cu126` |
+
+先看会装什么、不实际安装：
+
+```bat
+setup.bat --check
+```
+
+```bash
+./setup.sh --check
+```
+
+> **CUDA 不需要单独装 toolkit**：PyTorch 的 CUDA wheel 自带运行库，
+> 你只需要装好 NVIDIA 显卡驱动（`nvidia-smi` 能跑就说明驱动就绪）。
+> 版本不匹配时用 `ZIMO_TORCH_INDEX` 覆盖索引即可。
 
 ## 2. 启动
 
@@ -92,6 +111,27 @@ INT8 体积约为 FP32 的 1/4，PPL 偏差通常在 0.2% 以内。
 
 侧栏底部「使用说明 / Docs」有十二章规格书：模型类型、六个训练器的架构与训练信号、
 五维自定义、三个部署平台、指标定义与常见问题。
+
+## 卸载
+
+```bat
+uninstall.bat           :: 删掉 .venv（setup 创建的唯一东西）
+uninstall.bat --purge   :: 同时删掉 runs/ 训练产物与缓存
+```
+
+```bash
+./uninstall.sh
+./uninstall.sh --purge
+```
+
+`setup` 只在这个文件夹里创建 `.venv`，不写系统 Python、不注册服务、不改注册表；
+想彻底清干净，删掉整个目录即可：
+
+```bash
+cd .. && rm -rf zimo-lm        # Windows: 直接删除文件夹
+```
+
+训练产物都在 `runs/`，导出包在 `runs/playground/export/`，都随 `--purge` 一起删除。
 
 ## 还是要用命令行？
 

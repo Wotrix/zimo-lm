@@ -58,6 +58,10 @@ cd zimo-lm
 **不用训练也能玩**：仓库自带 4.31M 参数的示例模型（`examples/demo/`），
 打开「模型测试台」输入几行候选即可看到打分、逐字 NLL 与纠错建议。
 
+安装脚本会**自动识卡**：有 NVIDIA 显卡就装 CUDA 版 PyTorch，没有就装 CPU 版
+（`setup.bat --check` 可先看清会装什么）。卸载用 `uninstall.bat` / `uninstall.sh`，
+它只删 `.venv`，不碰系统环境。
+
 更多细节见 [quickstart.md](quickstart.md)。
 
 ## 截图

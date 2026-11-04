@@ -64,6 +64,10 @@ cd zimo-lm
 (`examples/demo/`). Open the playground, type a few candidates, and you get
 scores, per-character NLL and correction hints immediately.
 
+The setup script **picks PyTorch for your hardware**: CUDA build when an NVIDIA
+GPU is present, CPU build otherwise (`setup.bat --check` prints the choice
+without installing). `uninstall.bat` / `uninstall.sh` removes only `.venv`.
+
 See [quickstart.md](quickstart.md) for details.
 
 ## Screenshots
