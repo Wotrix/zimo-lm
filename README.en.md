@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" width="880" alt="Zimo Studio playground">
+  <img src="docs/screenshot-results.png" width="880" alt="Candidate scoring">
 </p>
 
 ---
@@ -75,13 +75,16 @@ See [quickstart.md](quickstart.md) for details.
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/screenshot-results.png" width="880" alt="Candidate scoring results">
-</p>
-
-<p align="center">
-  <sub>Sorted by PPL: rank 1 in green, outliers in red. Below: per-character NLL, batch scoring, generation and correction tools.</sub>
-</p>
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshot.png" alt="Model playground"></td>
+    <td width="50%"><img src="docs/screenshot-export.png" alt="Export and quantization"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Playground: side-by-side specs, scoring, per-char NLL and correction tools</sub></td>
+    <td align="center"><sub>Export: ONNX FP32/INT8, safetensors, TJGPT, generated C++ skeleton</sub></td>
+  </tr>
+</table>
 
 ## What you can train
 
@@ -94,6 +97,10 @@ See [quickstart.md](quickstart.md) for details.
 Character-level tokenization means **no tokenizer needed** — Chinese corpora
 work as-is. The trade-off: a few-thousand-token vocabulary and weak
 cross-lingual ability.
+
+Corpora can be a single file, a directory, or several files selected at once;
+`.txt` / `.jsonl` / `.jsonl.gz` are supported and UTF-8 (with or without BOM)
+as well as GBK/GB18030 decode correctly.
 
 ## Deployment formats
 

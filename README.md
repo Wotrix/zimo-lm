@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" width="880" alt="Zimo Studio 模型测试台">
+  <img src="docs/screenshot-results.png" width="880" alt="候选打分结果">
 </p>
 
 ---
@@ -69,13 +69,16 @@ cd zimo-lm
 
 ## 截图
 
-<p align="center">
-  <img src="docs/screenshot-results.png" width="880" alt="候选打分结果">
-</p>
-
-<p align="center">
-  <sub>PPL 升序排列，Rank 1 标绿、离谱值标红；下方是逐字 NLL、批量打分、文本生成与纠错工具。</sub>
-</p>
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshot.png" alt="模型测试台"></td>
+    <td width="50%"><img src="docs/screenshot-export.png" alt="导出与量化"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>模型测试台：结构参数并排对比、候选打分、逐字 NLL 与纠错工具</sub></td>
+    <td align="center"><sub>导出与量化：ONNX FP32/INT8、safetensors、TJGPT、C++ 推理骨架</sub></td>
+  </tr>
+</table>
 
 ## 能训什么
 
@@ -86,6 +89,9 @@ cd zimo-lm
 | 分词语料 + 词表 | 统计 n-gram（3-gram / 词级） | MCU 与极低资源设备 |
 
 字符级切分意味着**不需要分词器**，中文语料开箱即用；代价是词表只有几千、跨语言能力弱。
+
+语料可以是单个文件、整个目录，或多选上传；支持 `.txt` / `.jsonl` / `.jsonl.gz`，
+UTF-8（含 BOM）与 GBK/GB18030 都能正确解码。
 
 ## 部署格式
 

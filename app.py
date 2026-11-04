@@ -1638,6 +1638,8 @@ def open_directory(path: str | Path) -> None:
 def load_existing_run(run_dir: str, arch_key: str) -> None:
     """Adopt an existing run directory so its model can be inspected/scored."""
     path = Path(run_dir).expanduser()
+    if not path.is_absolute():
+        path = APP_DIR / path          # relative paths resolve against the repo
     if not path.is_dir():
         st.error(f"目录不存在：{path}")
         return
