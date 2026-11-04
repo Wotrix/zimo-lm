@@ -2,14 +2,18 @@
 """Terminal progress panel for a Zimo training run (stdlib only).
 
     python monitor.py                      # newest run under runs/
-    python monitor.py --run runs/20261104_120000_gpt2
+    python monitor.py --run runs/xxx
     python monitor.py --run runs/xxx -w    # refresh every 10s (Ctrl+C to stop)
     python monitor.py --run runs/xxx -w -i 5
+    python monitor.py --run runs/xxx --no-color
 
 Reads ``status.json`` and ``metrics.jsonl`` from the run directory, so it works
 for a run started by the Studio, by ``train_gpt.py`` on a rented GPU box, or
-after the page was closed.  GPU facts come from ``nvidia-smi`` when present;
-everything else is plain stdlib.
+after the page was closed.  GPU facts come from ``nvidia-smi`` when present.
+
+Layout: a fixed-width card.  CJK glyphs are two columns wide, so every padded
+line goes through ``disp_width`` instead of ``len`` — otherwise the right
+border drifts (that was the "scattered" look).
 """
 
 from __future__ import annotations
@@ -21,11 +25,46 @@ import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 from pathlib import Path
 from typing import Optional
 
+CARD_WIDTH = 62          # inner width in display columns
+BAR_WIDTH = 34
 BLOCKS = "▁▂▃▄▅▆▇█"
-BAR_WIDTH = 28
+
+
+# ---------------------------------------------------------------------------
+# width-aware text helpers
+# ---------------------------------------------------------------------------
+
+def char_width(char: str) -> int:
+    """2 for East Asian wide/fullwidth glyphs, 0 for combining, else 1."""
+    if unicodedata.combining(char):
+        return 0
+    return 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+
+
+def disp_width(text: str) -> int:
+    return sum(char_width(ch) for ch in text)
+
+
+def pad(text: str, width: int) -> str:
+    return text + " " * max(0, width - disp_width(text))
+
+
+def fit(text: str, width: int) -> str:
+    """Truncate to a display width, appending an ellipsis when cut."""
+    if disp_width(text) <= width:
+        return text
+    out, used = "", 0
+    for ch in text:
+        w = char_width(ch)
+        if used + w > width - 1:
+            break
+        out += ch
+        used += w
+    return out + "…"
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +72,6 @@ BAR_WIDTH = 28
 # ---------------------------------------------------------------------------
 
 def find_newest_run(root: Path) -> Optional[Path]:
-    """Newest directory under ``root`` that contains a status.json."""
     if not root.is_dir():
         return None
     candidates = [p for p in root.iterdir()
@@ -44,10 +82,10 @@ def find_newest_run(root: Path) -> Optional[Path]:
 
 
 def read_status(run_dir: Path, path: Optional[Path] = None) -> dict:
-    target = path or (run_dir / "status.json")
+    target = Path(path) if path else (run_dir / "status.json")
     try:
-        return json.loads(Path(target).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        return json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
         return {}
 
 
@@ -72,7 +110,7 @@ def read_metrics(run_dir: Path, override: Optional[Path] = None) -> list[dict]:
 
 
 def ppl_series(rows: list[dict]) -> list[float]:
-    """PPL values of the *current* run (restarts after a step reset)."""
+    """PPL values of the *current* run (steps restart between runs)."""
     if not rows:
         return []
     start = 0
@@ -83,7 +121,7 @@ def ppl_series(rows: list[dict]) -> list[float]:
 
 
 # ---------------------------------------------------------------------------
-# rendering helpers (unit-tested, no state)
+# small renderers (unit-tested)
 # ---------------------------------------------------------------------------
 
 def smooth(values: list[float], window: int = 7) -> list[float]:
@@ -101,11 +139,10 @@ def downsample(values: list[float], width: int) -> list[float]:
     if len(values) <= width:
         return list(values)
     step = max(1, len(values) // width)
-    sampled = values[::step]
-    return sampled[-width:]
+    return values[::step][-width:]
 
 
-def sparkline(values: list[float], width: int = 44) -> str:
+def sparkline(values: list[float], width: int = 34) -> str:
     if not values:
         return ""
     sample = downsample(values, width)
@@ -116,10 +153,11 @@ def sparkline(values: list[float], width: int = 44) -> str:
                    for v in sample)
 
 
-def progress_bar(percent: float, width: int = BAR_WIDTH) -> str:
+def bar(percent: float, width: int = BAR_WIDTH, full: str = "█",
+        empty: str = "░") -> str:
     percent = max(0.0, min(100.0, percent))
     filled = int(round(percent / 100 * width))
-    return "[" + "#" * filled + "." * (width - filled) + "]"
+    return full * filled + empty * (width - filled)
 
 
 def format_seconds(seconds: float) -> str:
@@ -131,12 +169,22 @@ def format_seconds(seconds: float) -> str:
     return f"{minutes}m"
 
 
+def format_count(value: float) -> str:
+    value = float(value or 0)
+    if value >= 1e9:
+        return f"{value / 1e9:.2f}B"
+    if value >= 1e6:
+        return f"{value / 1e6:.2f}M"
+    if value >= 1e3:
+        return f"{value / 1e3:.1f}k"
+    return str(int(value))
+
+
 # ---------------------------------------------------------------------------
 # hardware
 # ---------------------------------------------------------------------------
 
 def gpu_info() -> Optional[list[str]]:
-    """nvidia-smi fields: name, util, mem_used, mem_total, temp, power."""
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu="
@@ -145,115 +193,185 @@ def gpu_info() -> Optional[list[str]]:
             capture_output=True, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return None
-    line = (out.stdout or "").strip().splitlines()
-    if not line:
+    lines = (out.stdout or "").strip().splitlines()
+    if not lines:
         return None
-    return [part.strip() for part in line[0].split(",")]
+    return [part.strip() for part in lines[0].split(",")]
 
 
-def cpu_info() -> str:
+def short_gpu_name(name: str) -> str:
+    for prefix in ("NVIDIA ", "GeForce ", "NVIDIA Corporation "):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+    return name
+
+
+def to_float(text: str) -> Optional[float]:
+    digits = "".join(ch for ch in (text or "") if ch.isdigit() or ch == ".")
     try:
-        cores = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
-    except AttributeError:
-        cores = os.cpu_count() or 1
-    if hasattr(os, "getloadavg"):
-        load = os.getloadavg()[0]
-        return f"{cores} 核   负载 {load:.1f}"
-    return f"{cores} 核"
-
-
-def memory_info() -> str:
-    try:
-        import psutil  # optional on Windows
-        vm = psutil.virtual_memory()
-        return f"{vm.used / 2**30:.0f} / {vm.total / 2**30:.0f} GB"
-    except Exception:  # noqa: BLE001 - optional dependency
-        pass
-    try:
-        with open("/proc/meminfo", encoding="utf-8") as handle:
-            info = dict(line.split(":", 1) for line in handle.read().splitlines())
-        total = int(info["MemTotal"].split()[0]) / 2**20
-        avail = int(info["MemAvailable"].split()[0]) / 2**20
-        return f"{total - avail:.0f} / {total:.0f} GB"
-    except (OSError, KeyError, ValueError):
-        return "–"
-
-
-def disk_info(path: Path) -> str:
-    try:
-        usage = shutil.disk_usage(str(path))
-        return f"{usage.used / 2**30:.1f} / {usage.total / 2**30:.0f} GB"
-    except OSError:
-        return "–"
+        return float(digits)
+    except ValueError:
+        return None
 
 
 # ---------------------------------------------------------------------------
 # panel
 # ---------------------------------------------------------------------------
 
-def render(run_dir: Path, status_path: Optional[Path] = None,
-           metrics_path: Optional[Path] = None) -> str:
-    status = read_status(run_dir, status_path)
-    rows = read_metrics(run_dir, metrics_path)
-    series = ppl_series(rows)
-    gpu = gpu_info()
+class Colors:
+    def __init__(self, enabled: bool):
+        self.enabled = enabled
 
-    title = gpu[0] if gpu else "CPU"
-    lines = [
-        "=" * 64,
-        f" ZIMO TRAIN MONITOR            {time.strftime('%H:%M:%S')}   {title}",
-        "=" * 64,
-        f" 目录   {run_dir.name}",
-    ]
+    def _wrap(self, code: str, text: str) -> str:
+        return f"\033[{code}m{text}\033[0m" if self.enabled else text
+
+    def dim(self, text: str) -> str:
+        return self._wrap("2", text)
+
+    def bold(self, text: str) -> str:
+        return self._wrap("1", text)
+
+    def green(self, text: str) -> str:
+        return self._wrap("32", text)
+
+    def cyan(self, text: str) -> str:
+        return self._wrap("36", text)
+
+    def yellow(self, text: str) -> str:
+        return self._wrap("33", text)
+
+
+def render(run_dir: Path, status_path: Optional[Path] = None,
+           metrics_path: Optional[Path] = None,
+           color: bool = False) -> str:
+    status = read_status(run_dir, status_path)
+    series = ppl_series(read_metrics(run_dir, metrics_path))
+    gpu = gpu_info()
+    c = Colors(color)
+
+    # Colours must not affect padding: build plain text, colour last.
+    def row(content: str) -> str:
+        return "│ " + pad(content, CARD_WIDTH) + " │"
+
+    def coloured_row(plain_parts: list[tuple[str, Optional[str]]]) -> str:
+        """plain_parts: [(text, colour_code|None)] laid out by display width."""
+        plain = "".join(text for text, _ in plain_parts)
+        tail = " " * max(0, CARD_WIDTH - disp_width(plain))
+        if not color:
+            return "│ " + plain + tail + " │"
+        painted = "".join(c._wrap(code, text) if code else text
+                          for text, code in plain_parts)
+        return "│ " + painted + tail + " │"
+
+    top = "┌" + "─" * (CARD_WIDTH + 2) + "┐"
+    mid = "├" + "─" * (CARD_WIDTH + 2) + "┤"
+    bottom = "└" + "─" * (CARD_WIDTH + 2) + "┘"
+
+    title = "ZIMO · 训练监控"
+    gpu_short = short_gpu_name(gpu[0]) if gpu else "CPU"
+    right = fit(f"{gpu_short}  {time.strftime('%H:%M:%S')}", 34)
+    gap = max(1, CARD_WIDTH - disp_width(title) - disp_width(right))
+    lines = [top, coloured_row([(title, "1"), (" " * gap, None), (right, "2")])]
 
     if not status:
-        lines.append(" (status.json 尚未生成，等待第一步)")
+        lines.append(mid)
+        lines.append(row("(status.json 尚未生成，等待第一步)"))
+        lines.append(bottom)
         return "\n".join(lines)
-
-    params = status.get("params") or 0
-    lines.append(f" 模型   {status.get('arch', '?'):<16} 参数 {params:,}")
-    lines.append(f" 语料   {status.get('tokens', 0):,} tokens   词表 {status.get('vocab', 0):,}")
-    lines.append("")
 
     step = status.get("step") or 0
     total = status.get("total_steps") or 0
     percent = step * 100 / total if total else 0
-    lines.append(f" 进度   {progress_bar(percent)} {percent:5.1f}%")
-    lines.append(f"        step {step:,} / {total:,}   epoch {status.get('epoch')}")
-    lines.append("")
-
     last_ppl = status.get("last_ppl")
     if last_ppl is None and series:
         last_ppl = round(series[-1], 1)
-    lines.append(f" 指标   loss {status.get('last_loss')}    ppl {last_ppl}")
-    speed = status.get("tokens_per_s") or 0
-    lines.append(
-        f" 速率   {speed:,.0f} tok/s   已跑 {format_seconds(status.get('elapsed_s') or 0)}"
-        f"   剩余 {format_seconds(status.get('eta_s') or 0)}")
+
+    # ---- progress ----
+    lines.append(mid)
+    bar_text = bar(percent)
+    pct_text = f"  {percent:5.1f}%"
+    lines.append(coloured_row([(" " + bar_text, "32"), (pct_text, None)]))
+
+    # ---- metrics grid: ASCII labels keep the columns stable ----
+    grid = [
+        ("step", f"{step:,} / {total:,}", "epoch", f"{status.get('epoch', 0)}"),
+        ("loss", f"{status.get('last_loss')}", "ppl", f"{last_ppl}"),
+        ("speed", f"{format_count(status.get('tokens_per_s'))} tok/s", "eta",
+         format_seconds(status.get("eta_s") or 0)),
+    ]
+    for left_label, left_value, right_label, right_value in grid:
+        lines.append(coloured_row([
+            (" " + pad(left_label, 6), "2"), (pad(left_value, 23), None),
+            (pad(right_label, 6), "2"), (right_value, None),
+        ]))
+
+    # ---- trend ----
     spark = sparkline(smooth(series))
     if spark:
-        lines.append(f" 趋势   {spark}  (PPL)")
         first, last = series[0], series[-1]
         drop = (1 - last / first) * 100 if first else 0
-        lines.append(f" 变化   PPL {first:.0f} -> {last:.1f}   (-{drop:.0f}%)")
-    lines.append("")
+        lines.append(row(""))
+        lines.append(coloured_row([(" trend ", "2"), (spark, "36")]))
+        lines.append(coloured_row(
+            [(f"       {first:.0f} → {last:.1f}", None),
+             (f"  (-{drop:.0f}%)", "2")]))
 
+    # ---- hardware ----
+    lines.append(mid)
     if gpu:
         _, util, used, mem_total, temp, power = gpu
-        lines.append(f" GPU    {gpu[0]}")
-        lines.append(f"        利用率 {util}   显存 {used} / {mem_total}   温度 {temp}   功耗 {power}")
-    memory = memory_info()
-    cpu_line = f" CPU    {cpu_info()}"
-    if memory != "–":
-        cpu_line += f"   内存 {memory}"
-    lines.append(cpu_line)
-    lines.append(f" 磁盘   {disk_info(run_dir)}")
-    lines.append("-" * 64)
+        used_gb = (to_float(used) or 0) / 1024
+        total_gb = (to_float(mem_total) or 1) / 1024
+        mem_pct = used_gb / total_gb * 100 if total_gb else 0
+        lines.append(coloured_row([
+            (" GPU  ", "2"), (bar(mem_pct, 18, "▮", "▯"), "32"),
+            (f"  {used_gb:4.1f}/{total_gb:.0f} GB", None),
+        ]))
+        lines.append(coloured_row([
+            ("      ", None),
+            (f"util {(to_float(util) or 0):3.0f}%  ·  {temp}°C  ·  {power}", None),
+        ]))
+    else:
+        lines.append(coloured_row([
+            (" GPU  ", "2"), ("未检测到 nvidia-smi（CPU 训练）", None)]))
+
+    try:
+        cores = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
+    except AttributeError:
+        cores = os.cpu_count() or 1
+    load = f"   load {os.getloadavg()[0]:.1f}" if hasattr(os, "getloadavg") else ""
+    try:
+        disk = shutil.disk_usage(str(run_dir))
+        disk_text = f"   disk {disk.used / 2**30:.1f}/{disk.total / 2**30:.0f} GB"
+    except OSError:
+        disk_text = ""
+    lines.append(coloured_row([
+        (" CPU  ", "2"), (f"{cores} cores{load}", None), (disk_text, "2")]))
+
+    # ---- model + state ----
+    lines.append(mid)
+    lines.append(coloured_row([
+        (" model ", "2"),
+        (fit(f"{status.get('arch', '?')} · "
+             f"{format_count(status.get('params'))} params · "
+             f"vocab {status.get('vocab', 0):,}", CARD_WIDTH - 7), None),
+    ]))
+    lines.append(coloured_row([
+        (" data  ", "2"),
+        (fit(f"{format_count(status.get('tokens'))} tokens · {run_dir.name}",
+             CARD_WIDTH - 7), None),
+    ]))
+
     state = status.get("state", "?")
     if state == "done":
-        lines.append(" 状态   训练已完成 ✓")
+        lines.append(coloured_row([(" ● done", "32"), ("   训练已完成", None)]))
     elif state == "running":
-        lines.append(" 状态   训练中（Ctrl+C 只停止查看）")
+        lines.append(coloured_row([(" ● running", "33"),
+                                   ("   Ctrl+C 只停止查看", "2")]))
+    else:
+        lines.append(coloured_row([(f" ● {state}", "2")]))
+
+    lines.append(bottom)
     return "\n".join(lines)
 
 
@@ -265,9 +383,11 @@ def main() -> int:
     parser.add_argument("--run", default="", help="运行目录；默认取 runs/ 下最新的")
     parser.add_argument("--runs-root", default="runs", help="runs 根目录（默认 runs）")
     parser.add_argument("-w", "--watch", action="store_true", help="持续刷新")
-    parser.add_argument("-i", "--interval", type=float, default=10.0, help="刷新间隔秒（默认 10）")
-    parser.add_argument("--status", default="", help="指定 status.json（默认在运行目录里找）")
+    parser.add_argument("-i", "--interval", type=float, default=10.0,
+                        help="刷新间隔秒（默认 10）")
+    parser.add_argument("--status", default="", help="指定 status.json")
     parser.add_argument("--metrics", default="", help="指定 metrics.jsonl")
+    parser.add_argument("--no-color", action="store_true", help="关闭颜色")
     args = parser.parse_args()
 
     if args.run:
@@ -275,22 +395,24 @@ def main() -> int:
     else:
         run_dir = find_newest_run(Path(args.runs_root).expanduser())
         if run_dir is None:
-            print(f"[x] {args.runs_root}/ 下没有找到带 status.json 的运行目录", file=sys.stderr)
+            print(f"[x] {args.runs_root}/ 下没有找到带 status.json 的运行目录",
+                  file=sys.stderr)
             return 1
 
     if not run_dir.is_dir():
         print(f"[x] 目录不存在：{run_dir}", file=sys.stderr)
         return 1
-    if not (run_dir / "status.json").is_file():
-        print(f"[!] {run_dir} 里没有 status.json（还没开始写入？）", file=sys.stderr)
 
+    color = (not args.no_color and sys.stdout.isatty()
+             and not os.environ.get("NO_COLOR"))
     try:
         while True:
             if args.watch:
-                sys.stdout.write("\033[H\033[J")  # clear (no Windows flicker)
+                sys.stdout.write("\033[H\033[J")
             print(render(run_dir,
                          Path(args.status) if args.status else None,
-                         Path(args.metrics) if args.metrics else None))
+                         Path(args.metrics) if args.metrics else None,
+                         color=color))
             sys.stdout.flush()
             if not args.watch:
                 return 0
