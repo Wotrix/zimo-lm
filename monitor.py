@@ -199,6 +199,20 @@ def gpu_info() -> Optional[list[str]]:
     return [part.strip() for part in lines[0].split(",")]
 
 
+def cpu_cores() -> int:
+    """Cores the container may actually use (cgroup quota), not host cores."""
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota != "max":
+            return max(1, round(int(quota) / int(period)))
+    except (OSError, ValueError):
+        pass
+    try:
+        return len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
+    except AttributeError:
+        return os.cpu_count() or 1
+
+
 def short_gpu_name(name: str) -> str:
     for prefix in ("NVIDIA ", "GeForce ", "NVIDIA Corporation "):
         if name.startswith(prefix):
@@ -335,10 +349,7 @@ def render(run_dir: Path, status_path: Optional[Path] = None,
         lines.append(coloured_row([
             (" GPU  ", "2"), ("未检测到 nvidia-smi（CPU 训练）", None)]))
 
-    try:
-        cores = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
-    except AttributeError:
-        cores = os.cpu_count() or 1
+    cores = cpu_cores()
     load = f"   load {os.getloadavg()[0]:.1f}" if hasattr(os, "getloadavg") else ""
     try:
         disk = shutil.disk_usage(str(run_dir))
