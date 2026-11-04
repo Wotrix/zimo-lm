@@ -40,7 +40,7 @@
 
 | 模块 | 能力 |
 |---|---|
-| 训练控制台 | 结构参数自由填写、四种预设、语料清洗、**后台守护训练**（断 SSH 不停）、断点续训、loss/PPL/吞吐曲线 |
+| 训练控制台 | 结构参数自由填写、四种预设、语料清洗、**后台守护训练**（断 SSH 不停）、断点续训、loss/PPL/吞吐曲线；命令行用 `python monitor.py -w` 看同款进度面板（GPU 型号/显存/功耗/趋势线） |
 | 模型测试台 | 自动加载或上传模型、A/B 参数对比、候选打分（Rank1 绿 / 离谱红）、逐字 NLL、批量打分导出 CSV、文本生成、**纠错建议**、专有名词保护 |
 | 导出与量化 | ONNX（FP32/INT8）、TorchScript、TFLite（实验）、safetensors、**TJGPT**（引擎直读）、自定义包名、C++ 推理骨架 |
 | 多格式加载 | `.pt` / `.pth` / `.ckpt` / `.bin` / `.safetensors`，缺配置时按权重形状反推 |
@@ -115,7 +115,7 @@ INT8 体积约为 FP32 的 1/4，PPL 偏差通常 < 0.2%。
 ## 文档
 
 - [quickstart.md](quickstart.md) — 安装、跑通、训第一个模型
-- [docs/cli.zh.md](docs/cli.zh.md) — 命令行训练完整指引（参数表、配方、常见错误）
+- [docs/cli.zh.md](docs/cli.zh.md) — 命令行训练完整指引（参数表、配方、常见错误、进度面板）
 - [docs/rent-gpu.md](docs/rent-gpu.md) — 租 GPU 训练全流程（选卡、装环境、冒烟、配方、费用）
 - Studio 内「使用说明 / Docs」— 十二章规格书：模型类型、六个训练器规格、五维自定义、部署平台、指标与常见问题
 - [MODEL_CARD.md](MODEL_CARD.md) · [DATA_CARD.md](DATA_CARD.md) — 模型与数据说明
