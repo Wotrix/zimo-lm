@@ -89,7 +89,9 @@ cat a.txt b.txt c.txt > corpus.txt
 | `--val-ratio` | 0.02 | 验证集比例，从尾部切 |
 | `--warmup` | 300 | 线性升温步数 |
 | `--save-every` | 500 | 每 N 步落盘，断线续训靠它 |
-| `--device` | auto | `auto` / `cpu` / `cuda` |
+| `--device` | auto | `auto` / `cpu` / `cuda` / `musa` |
+| `--amp` | auto | `auto`（GPU 上用 bf16）/ `off` / `bf16` / `fp16`；bf16 与 FP32 相对误差 ~3e-5 |
+| `--compile` | 关 | `torch.compile` 加速，质量不变，首次编译较慢 |
 | `--resume` | 关 | 从 `--out` 里的 `model.pt` 继续 |
 | `--max-steps` | 0 | 最多多少步，调试时可设 50 |
 | `--tied` | 关 | 共享输入词向量与输出头 |

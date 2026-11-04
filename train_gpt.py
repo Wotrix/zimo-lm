@@ -169,6 +169,10 @@ def main() -> int:
                     help="状态文件（默认 <out>/status.json）")
     ap.add_argument("--device", default="auto",
                     help="运行设备：auto | cpu | cuda | musa（默认自动检测；摩尔线程用 musa）")
+    ap.add_argument("--amp", default="auto", choices=["auto", "off", "bf16", "fp16"],
+                    help="混合精度：auto=GPU 上用 bf16，off=纯 FP32；bf16 数值稳定且几乎无损")
+    ap.add_argument("--compile", action="store_true",
+                    help="用 torch.compile 加速（首次编译较慢，质量不变）")
     ap.add_argument("--tied", action="store_true",
                     help="共享输入词向量与输出头（默认不共享）")
     ap.add_argument("--resume", action="store_true",
@@ -210,10 +214,31 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             pass
 
+    # ---- mixed precision ----
+    use_amp = False
+    amp_dtype = torch.float32
+    scaler = None
+    if args.amp != "off" and device.type in ("cuda", "musa"):
+        want = args.amp if args.amp != "auto" else "bf16"
+        if want == "bf16":
+            use_amp, amp_dtype = True, torch.bfloat16
+        elif want == "fp16":
+            use_amp, amp_dtype = True, torch.float16
+            scaler = torch.amp.GradScaler("cuda")
+    print(f"[lm] amp={'{dtype}'.format(dtype=str(amp_dtype).replace('torch.', '')) if use_amp else 'off'}",
+          flush=True)
+
     torch.manual_seed(7)
     model = GPTLM(len(vocab) + 1, seq, args.dim, args.layers, args.heads).to(device)
     if args.tied:
         model.head.weight = model.tok.weight
+    if args.compile:
+        try:
+            model = torch.compile(model)  # type: ignore[assignment]
+            print("[lm] torch.compile enabled", flush=True)
+        except Exception as exc:  # noqa: BLE001 - never block training
+            print(f"[lm] torch.compile unavailable ({type(exc).__name__}), continuing",
+                  flush=True)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     params = sum(p.numel() for p in model.parameters())
     start_epoch = 0
@@ -260,8 +285,11 @@ def main() -> int:
                 continue
             chunk = train_data[idx].to(device, non_blocking=True)
             x, y = chunk[:, :-1], chunk[:, 1:]
-            logits = model(x)
-            loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
+            with torch.autocast(device_type=device.type, dtype=amp_dtype,
+                                enabled=use_amp):
+                logits = model(x)
+                loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)),
+                                       y.reshape(-1))
             # warmup + 余弦退火
             if global_step < args.warmup:
                 lr = args.lr * (global_step + 1) / max(1, args.warmup)
@@ -271,9 +299,16 @@ def main() -> int:
             for g in opt.param_groups:
                 g["lr"] = lr
             opt.zero_grad(set_to_none=True)
-            loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
+            if scaler is not None:
+                scaler.scale(loss).backward()
+                scaler.unscale_(opt)
+                nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                scaler.step(opt)
+                scaler.update()
+            else:
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step()
 
             lv = float(loss.detach())
             running += lv
@@ -329,9 +364,11 @@ def main() -> int:
                     if vc.shape[0] < 2:
                         continue
                     xv, yv = vc[:, :-1], vc[:, 1:]
-                    lg = model(xv)
-                    vloss += float(F.cross_entropy(
-                        lg.reshape(-1, lg.size(-1)), yv.reshape(-1)))
+                    with torch.autocast(device_type=device.type, dtype=amp_dtype,
+                                        enabled=use_amp):
+                        lg = model(xv)
+                        vloss += float(F.cross_entropy(
+                            lg.reshape(-1, lg.size(-1)), yv.reshape(-1)))
                     vn += 1
             model.train()
             v = vloss / max(vn, 1)

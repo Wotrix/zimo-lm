@@ -45,7 +45,7 @@ reranks candidates afterwards.
 
 | Area | What you get |
 |---|---|
-| Training console | Free-form architecture and params, four presets, corpus cleaning, **detached training** (survives browser close / SSH drop), resume, loss/PPL/throughput charts; `python monitor.py -w` gives the same panel in a terminal (GPU model, VRAM, power, PPL sparkline) |
+| Training console | Free-form architecture and params, four presets, corpus cleaning, **detached training** (survives browser close / SSH drop), resume, **bf16 autocast (~3e-5 vs FP32)**, loss/PPL/throughput charts; `python monitor.py -w` gives the same panel in a terminal (GPU model, VRAM, power, PPL sparkline) |
 | Model playground | Auto-load or upload, A/B spec comparison, candidate scoring (rank 1 green, outliers red), per-character NLL, batch scoring to CSV, sampled generation, **correction hints**, proper-noun protection |
 | Export & quantization | ONNX (FP32/INT8), TorchScript, TFLite (experimental), safetensors, **TJGPT** (engine-native), custom bundle name, generated C++ skeleton |
 | Multi-format loading | `.pt` / `.pth` / `.ckpt` / `.bin` / `.safetensors`; missing config is inferred from tensor shapes |
