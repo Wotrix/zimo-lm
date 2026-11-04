@@ -361,9 +361,11 @@ def render(run_dir: Path, status_path: Optional[Path] = None,
 
     # ---- model + state ----
     lines.append(mid)
+    amp = status.get("amp")
+    amp_part = f" · {amp}" if amp else ""
     lines.append(coloured_row([
         (" model ", "2"),
-        (fit(f"{status.get('arch', '?')} · "
+        (fit(f"{status.get('arch', '?')}{amp_part} · "
              f"{format_count(status.get('params'))} params · "
              f"vocab {status.get('vocab', 0):,}", CARD_WIDTH - 7), None),
     ]))

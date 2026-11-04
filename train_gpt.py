@@ -225,8 +225,8 @@ def main() -> int:
         elif want == "fp16":
             use_amp, amp_dtype = True, torch.float16
             scaler = torch.amp.GradScaler("cuda")
-    print(f"[lm] amp={'{dtype}'.format(dtype=str(amp_dtype).replace('torch.', '')) if use_amp else 'off'}",
-          flush=True)
+    amp_label = (str(amp_dtype).replace("torch.", "") if use_amp else "off")
+    print(f"[lm] amp={amp_label}", flush=True)
 
     torch.manual_seed(7)
     model = GPTLM(len(vocab) + 1, seq, args.dim, args.layers, args.heads).to(device)
@@ -272,6 +272,7 @@ def main() -> int:
         "step": global_step, "elapsed_s": 0, "eta_s": None,
         "tokens_per_s": 0, "last_loss": None, "last_ppl": None,
         "arch": f"gpt2 {args.layers}x{args.dim}",
+        "amp": amp_label,
     })
 
     best_val = float("inf")
@@ -339,6 +340,7 @@ def main() -> int:
                     "last_loss": round(avg, 4),
                     "last_ppl": round(min(1e6, ppl), 1),
                     "arch": f"gpt2 {args.layers}x{args.dim}",
+        "amp": amp_label,
                 })
                 if global_step % 200 == 0:
                     print(f"[lm] epoch={epoch} step={global_step} loss={avg:.4f} "
@@ -405,6 +407,7 @@ def main() -> int:
         "eta_s": 0, "tokens_per_s": 0,
         "last_loss": round(float(loss.detach()), 4), "last_ppl": None,
         "arch": f"gpt2 {args.layers}x{args.dim}",
+        "amp": amp_label,
     })
     print("[lm] done", flush=True)
     return 0
